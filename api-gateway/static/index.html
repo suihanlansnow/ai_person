@@ -1,0 +1,757 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI Person - Voice Dialogue</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+        }
+
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+
+        .header {
+            text-align: center;
+            color: white;
+            margin-bottom: 30px;
+        }
+
+        .header h1 {
+            font-size: 2.5rem;
+            font-weight: 700;
+            margin-bottom: 10px;
+        }
+
+        .header p {
+            font-size: 1.1rem;
+            opacity: 0.9;
+        }
+
+        .chat-container {
+            background: white;
+            border-radius: 20px;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+            overflow: hidden;
+        }
+
+        .chat-header {
+            background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);
+            color: white;
+            padding: 20px;
+            display: flex;
+            align-items: center;
+            gap: 15px;
+        }
+
+        .avatar {
+            width: 50px;
+            height: 50px;
+            border-radius: 50%;
+            background: white;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 24px;
+        }
+
+        .chat-info h2 {
+            font-size: 1.3rem;
+            font-weight: 600;
+        }
+
+        .chat-info p {
+            opacity: 0.9;
+            font-size: 0.9rem;
+        }
+
+        .chat-messages {
+            height: 450px;
+            overflow-y: auto;
+            padding: 20px;
+            background: #f8f9fa;
+        }
+
+        .message {
+            display: flex;
+            gap: 12px;
+            margin-bottom: 20px;
+            animation: fadeIn 0.3s ease;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        .message.user .avatar {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+        }
+
+        .message.assistant .avatar {
+            background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);
+            color: white;
+        }
+
+        .message .content {
+            flex: 1;
+            max-width: 75%;
+        }
+
+        .message.user .content {
+            text-align: right;
+        }
+
+        .message .bubble {
+            display: inline-block;
+            padding: 12px 18px;
+            border-radius: 20px;
+            font-size: 1rem;
+            line-height: 1.5;
+        }
+
+        .message.user .bubble {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border-bottom-right-radius: 4px;
+        }
+
+        .message.assistant .bubble {
+            background: white;
+            color: #333;
+            border: 1px solid #e9ecef;
+            border-bottom-left-radius: 4px;
+        }
+
+        .message .time {
+            font-size: 0.75rem;
+            color: #999;
+            margin-top: 5px;
+        }
+
+        .emotion-badge {
+            display: inline-block;
+            padding: 3px 10px;
+            border-radius: 20px;
+            font-size: 0.7rem;
+            margin-top: 5px;
+        }
+
+        .emotion-happy { background: #ffecd2; color: #f59e0b; }
+        .emotion-sad { background: #dbeafe; color: #3b82f6; }
+        .emotion-angry { background: #fee2e2; color: #ef4444; }
+        .emotion-neutral { background: #f3f4f6; color: #6b7280; }
+
+        .audio-wave {
+            display: flex;
+            align-items: center;
+            gap: 2px;
+            height: 20px;
+            padding: 5px 10px;
+        }
+
+        .wave-bar {
+            width: 3px;
+            background: rgba(255,255,255,0.7);
+            border-radius: 2px;
+            animation: wave 0.8s infinite ease-in-out;
+        }
+
+        @keyframes wave {
+            0%, 100% { height: 4px; }
+            50% { height: 20px; }
+        }
+
+        .audio-wave .wave-bar:nth-child(1) { animation-delay: 0s; }
+        .audio-wave .wave-bar:nth-child(2) { animation-delay: 0.1s; }
+        .audio-wave .wave-bar:nth-child(3) { animation-delay: 0.2s; }
+        .audio-wave .wave-bar:nth-child(4) { animation-delay: 0.3s; }
+        .audio-wave .wave-bar:nth-child(5) { animation-delay: 0.4s; }
+        .audio-wave .wave-bar:nth-child(6) { animation-delay: 0.5s; }
+        .audio-wave .wave-bar:nth-child(7) { animation-delay: 0.6s; }
+
+        .audio-player {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            background: rgba(255,255,255,0.2);
+            border-radius: 20px;
+            padding: 5px 12px;
+            cursor: pointer;
+            transition: all 0.2s;
+            min-width: 80px;
+        }
+
+        .audio-player:hover {
+            background: rgba(255,255,255,0.3);
+        }
+
+        .audio-player.playing {
+            background: rgba(255,255,255,0.3);
+        }
+
+        .audio-player .play-btn {
+            font-size: 12px;
+            width: 24px;
+            height: 24px;
+            border-radius: 50%;
+            background: white;
+            color: #667eea;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            flex-shrink: 0;
+        }
+
+        .audio-player .duration {
+            font-size: 0.75rem;
+            color: rgba(255,255,255,0.8);
+        }
+
+        .input-container {
+            padding: 20px;
+            background: white;
+            border-top: 1px solid #e9ecef;
+        }
+
+        .input-row {
+            display: flex;
+            gap: 12px;
+        }
+
+        .text-input {
+            flex: 1;
+            padding: 15px 20px;
+            border: 2px solid #e9ecef;
+            border-radius: 50px;
+            font-size: 1rem;
+            outline: none;
+            transition: border-color 0.3s, box-shadow 0.3s;
+        }
+
+        .text-input:focus {
+            border-color: #667eea;
+            box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+        }
+
+        .btn {
+            width: 55px;
+            height: 55px;
+            border-radius: 50%;
+            border: none;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 20px;
+            transition: all 0.3s;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.15);
+        }
+
+        .btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(0, 0, 0, 0.2);
+        }
+
+        .btn:active {
+            transform: translateY(0);
+        }
+
+        .btn-send {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+        }
+
+        .btn-mic {
+            background: linear-gradient(135deg, #11998e 0%, #38ef7d 100%);
+            color: white;
+        }
+
+        .btn-mic.active {
+            background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%);
+            animation: pulse 1s infinite;
+        }
+
+        @keyframes pulse {
+            0%, 100% { transform: scale(1); }
+            50% { transform: scale(1.05); }
+        }
+
+        .btn-play {
+            background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);
+            color: white;
+            width: 40px;
+            height: 40px;
+            font-size: 16px;
+        }
+
+        .btn-play:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        .status-bar {
+            background: #f8f9fa;
+            padding: 10px 20px;
+            text-align: center;
+            font-size: 0.85rem;
+            color: #666;
+        }
+
+        .status-online {
+            color: #10b981;
+        }
+
+        .status-processing {
+            color: #f59e0b;
+        }
+
+        .typing-indicator {
+            display: inline-flex;
+            gap: 4px;
+        }
+
+        .typing-indicator span {
+            width: 8px;
+            height: 8px;
+            background: #999;
+            border-radius: 50%;
+            animation: typing 1.4s infinite ease-in-out;
+        }
+
+        .typing-indicator span:nth-child(2) { animation-delay: 0.2s; }
+        .typing-indicator span:nth-child(3) { animation-delay: 0.4s; }
+
+        @keyframes typing {
+            0%, 80%, 100% { transform: scale(0.6); opacity: 0.5; }
+            40% { transform: scale(1); opacity: 1; }
+        }
+
+        .hidden {
+            display: none;
+        }
+
+        @media (max-width: 600px) {
+            .container {
+                padding: 10px;
+            }
+
+            .header h1 {
+                font-size: 1.8rem;
+            }
+
+            .chat-messages {
+                height: 350px;
+            }
+
+            .message .content {
+                max-width: 85%;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🎤 AI Person</h1>
+            <p>智能语音对话助手 - 音频直传模式</p>
+        </div>
+
+        <div class="chat-container">
+            <div class="chat-header">
+                <div class="avatar">🤖</div>
+                <div class="chat-info">
+                    <h2>AI Assistant</h2>
+                    <p class="status-online">🟢 Online</p>
+                </div>
+            </div>
+
+            <div class="chat-messages" id="chatMessages">
+                <div class="message assistant">
+                    <div class="avatar">🤖</div>
+                    <div class="content">
+                        <div class="bubble">
+                            你好！我是你的AI语音助手，点击麦克风录制音频开始对话。
+                        </div>
+                        <div class="time">刚刚</div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="input-container">
+                <div class="input-row">
+                    <button class="btn btn-mic" id="micBtn" title="录制音频">
+                        🎤
+                    </button>
+                    <input 
+                        type="text" 
+                        class="text-input" 
+                        id="textInput" 
+                        placeholder="输入消息或点击麦克风录制..."
+                        autocomplete="off"
+                    >
+                    <button class="btn btn-send" id="sendBtn" title="发送">
+                        ➤
+                    </button>
+                </div>
+                <div id="recordingInfo" style="text-align: center; margin-top: 10px; color: #666; font-size: 0.85rem; display: none;">
+                    🎙️ 正在录制... 再次点击结束录制
+                </div>
+            </div>
+
+            <div class="status-bar" id="statusBar">
+                <span class="status-online">🟢 All services online</span>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const API_URL = 'http://localhost:8000/api';
+
+        const chatMessages = document.getElementById('chatMessages');
+        const textInput = document.getElementById('textInput');
+        const sendBtn = document.getElementById('sendBtn');
+        const micBtn = document.getElementById('micBtn');
+        const statusBar = document.getElementById('statusBar');
+        const recordingInfo = document.getElementById('recordingInfo');
+
+        let mediaRecorder = null;
+        let audioChunks = [];
+        let isRecording = false;
+        let currentPlayingAudio = null;
+        let sentAudioBlobs = [];
+
+        async function initAudioRecording() {
+            try {
+                const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+                mediaRecorder = new MediaRecorder(stream);
+
+                mediaRecorder.ondataavailable = (event) => {
+                    if (event.data.size > 0) {
+                        audioChunks.push(event.data);
+                    }
+                };
+
+                mediaRecorder.onstop = async () => {
+                    const audioBlob = new Blob(audioChunks, { type: 'audio/wav' });
+                    audioChunks = [];
+                    
+                    await sendAudioMessage(audioBlob);
+                };
+
+            } catch (error) {
+                console.error('Audio recording error:', error);
+                alert('无法访问麦克风，请确保已授予权限');
+            }
+        }
+
+        function speak(text) {
+            if ('speechSynthesis' in window) {
+                window.speechSynthesis.cancel();
+                
+                const utterance = new SpeechSynthesisUtterance(text);
+                utterance.lang = 'zh-CN';
+                utterance.rate = 0.9;
+                utterance.pitch = 1;
+                
+                utterance.onstart = () => {
+                    statusBar.innerHTML = '<span class="status-processing">🔊 Speaking...</span>';
+                };
+                
+                utterance.onend = () => {
+                    statusBar.innerHTML = '<span class="status-online">🟢 Ready</span>';
+                };
+                
+                window.speechSynthesis.speak(utterance);
+            }
+        }
+
+        function formatDuration(seconds) {
+            const mins = Math.floor(seconds / 60);
+            const secs = Math.floor(seconds % 60);
+            return `${mins}:${secs.toString().padStart(2, '0')}`;
+        }
+
+        function createAudioPlayer(audioBlob, messageDiv) {
+            const audioUrl = URL.createObjectURL(audioBlob);
+            const audio = new Audio(audioUrl);
+            
+            audio.addEventListener('loadedmetadata', () => {
+                const duration = formatDuration(audio.duration);
+                const playerDiv = messageDiv.querySelector('.audio-player');
+                if (playerDiv) {
+                    playerDiv.querySelector('.duration').textContent = duration;
+                }
+            });
+
+            audio.addEventListener('ended', () => {
+                const playerDiv = messageDiv.querySelector('.audio-player');
+                if (playerDiv) {
+                    playerDiv.classList.remove('playing');
+                    playerDiv.querySelector('.play-btn').textContent = '▶';
+                }
+                currentPlayingAudio = null;
+            });
+
+            audio.addEventListener('timeupdate', () => {
+                const playerDiv = messageDiv.querySelector('.audio-player');
+                if (playerDiv && audio.duration) {
+                    const current = formatDuration(audio.currentTime);
+                    playerDiv.querySelector('.duration').textContent = `${current}`;
+                }
+            });
+
+            const playerDiv = document.createElement('div');
+            playerDiv.className = 'audio-player';
+            playerDiv.innerHTML = `
+                <div class="play-btn">▶</div>
+                <div class="duration">0:00</div>
+            `;
+
+            playerDiv.addEventListener('click', () => {
+                if (currentPlayingAudio && currentPlayingAudio !== audio) {
+                    currentPlayingAudio.pause();
+                    currentPlayingAudio.currentTime = 0;
+                    document.querySelectorAll('.audio-player.playing').forEach(el => {
+                        el.classList.remove('playing');
+                        el.querySelector('.play-btn').textContent = '▶';
+                    });
+                }
+
+                if (audio.paused) {
+                    audio.play();
+                    playerDiv.classList.add('playing');
+                    playerDiv.querySelector('.play-btn').textContent = '⏸';
+                    currentPlayingAudio = audio;
+                } else {
+                    audio.pause();
+                    playerDiv.classList.remove('playing');
+                    playerDiv.querySelector('.play-btn').textContent = '▶';
+                    currentPlayingAudio = null;
+                }
+            });
+
+            return playerDiv;
+        }
+
+        function addMessage(text, isUser, emotion = null, audioBlob = null) {
+            const messageDiv = document.createElement('div');
+            messageDiv.className = `message ${isUser ? 'user' : 'assistant'}`;
+            
+            const avatarEmoji = isUser ? '👤' : '🤖';
+            
+            let emotionBadge = '';
+            if (emotion) {
+                const emotionClass = `emotion-${emotion}`;
+                const emotionText = getEmotionText(emotion);
+                emotionBadge = `<div class="emotion-badge ${emotionClass}">${emotionText}</div>`;
+            }
+            
+            let contentHtml = text || '';
+
+            messageDiv.innerHTML = `
+                <div class="avatar">${avatarEmoji}</div>
+                <div class="content">
+                    <div class="bubble">${contentHtml}</div>
+                    ${emotionBadge}
+                    <div class="time">${getCurrentTime()}</div>
+                </div>
+            `;
+
+            if (audioBlob) {
+                const bubble = messageDiv.querySelector('.bubble');
+                bubble.style.display = 'flex';
+                bubble.style.alignItems = 'center';
+                bubble.style.gap = '8px';
+                const audioPlayer = createAudioPlayer(audioBlob, messageDiv);
+                bubble.insertBefore(audioPlayer, bubble.firstChild);
+            }
+            
+            chatMessages.appendChild(messageDiv);
+            chatMessages.scrollTop = chatMessages.scrollHeight;
+        }
+
+        function addTypingIndicator() {
+            const typingDiv = document.createElement('div');
+            typingDiv.className = 'message assistant';
+            typingDiv.innerHTML = `
+                <div class="avatar">🤖</div>
+                <div class="content">
+                    <div class="bubble">
+                        <div class="typing-indicator">
+                            <span></span><span></span><span></span>
+                        </div>
+                    </div>
+                </div>
+            `;
+            chatMessages.appendChild(typingDiv);
+            chatMessages.scrollTop = chatMessages.scrollHeight;
+            
+            return typingDiv;
+        }
+
+        function removeTypingIndicator(typingDiv) {
+            if (typingDiv && typingDiv.parentNode) {
+                typingDiv.parentNode.removeChild(typingDiv);
+            }
+        }
+
+        function getEmotionText(emotion) {
+            const emotions = {
+                'happy': '😊 Happy',
+                'sad': '😢 Sad',
+                'angry': '😠 Angry',
+                'fear': '😨 Fear',
+                'surprise': '😲 Surprise',
+                'neutral': '😐 Neutral'
+            };
+            return emotions[emotion] || 'Unknown';
+        }
+
+        function getCurrentTime() {
+            const now = new Date();
+            return now.toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' });
+        }
+
+        async function sendAudioMessage(audioBlob) {
+            sentAudioBlobs.push(audioBlob);
+            
+            addMessage('', true, null, audioBlob);
+            
+            const typingDiv = addTypingIndicator();
+
+            try {
+                statusBar.innerHTML = '<span class="status-processing">🔄 Processing audio...</span>';
+
+                const formData = new FormData();
+                formData.append('audio', audioBlob, 'recording.wav');
+                formData.append('session_id', 'web-session');
+
+                const response = await fetch(`${API_URL}/dialogue/audio`, {
+                    method: 'POST',
+                    body: formData
+                });
+
+                const data = await response.json();
+
+                removeTypingIndicator(typingDiv);
+                
+                addMessage(data.text, false, data.emotion);
+                
+                speak(data.text);
+
+            } catch (error) {
+                removeTypingIndicator(typingDiv);
+                addMessage('抱歉，服务暂时不可用，请稍后重试。', false);
+                console.error('Error:', error);
+            } finally {
+                statusBar.innerHTML = '<span class="status-online">🟢 Ready</span>';
+            }
+        }
+
+        async function sendTextMessage(text) {
+            if (!text.trim()) return;
+
+            addMessage(text, true);
+            textInput.value = '';
+
+            const typingDiv = addTypingIndicator();
+
+            try {
+                statusBar.innerHTML = '<span class="status-processing">🔄 Processing...</span>';
+
+                const response = await fetch(`${API_URL}/dialogue`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        session_id: 'web-session',
+                        text: text
+                    })
+                });
+
+                const data = await response.json();
+
+                removeTypingIndicator(typingDiv);
+                
+                addMessage(data.text, false, data.emotion);
+                
+                speak(data.text);
+
+            } catch (error) {
+                removeTypingIndicator(typingDiv);
+                addMessage('抱歉，服务暂时不可用，请稍后重试。', false);
+                console.error('Error:', error);
+            } finally {
+                statusBar.innerHTML = '<span class="status-online">🟢 Ready</span>';
+            }
+        }
+
+        sendBtn.addEventListener('click', () => {
+            sendTextMessage(textInput.value);
+        });
+
+        textInput.addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') {
+                sendTextMessage(textInput.value);
+            }
+        });
+
+        micBtn.addEventListener('click', async () => {
+            if (!mediaRecorder) {
+                await initAudioRecording();
+            }
+
+            if (isRecording) {
+                mediaRecorder.stop();
+                isRecording = false;
+                micBtn.classList.remove('active');
+                recordingInfo.style.display = 'none';
+            } else {
+                audioChunks = [];
+                mediaRecorder.start(100);
+                isRecording = true;
+                micBtn.classList.add('active');
+                recordingInfo.style.display = 'block';
+            }
+        });
+
+        async function checkServices() {
+            try {
+                const response = await fetch(`${API_URL}/services`);
+                const services = await response.json();
+                
+                const allHealthy = Object.values(services).every(s => s.status === 'healthy');
+                
+                if (allHealthy) {
+                    statusBar.innerHTML = '<span class="status-online">🟢 All services online</span>';
+                } else {
+                    statusBar.innerHTML = '<span class="status-processing">⚠️ Some services unavailable</span>';
+                }
+            } catch (error) {
+                statusBar.innerHTML = '<span class="status-processing">🔴 Services offline</span>';
+            }
+        }
+
+        document.addEventListener('DOMContentLoaded', () => {
+            initAudioRecording();
+            checkServices();
+            setInterval(checkServices, 10000);
+        });
+    </script>
+</body>
+</html>

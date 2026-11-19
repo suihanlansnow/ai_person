@@ -1,0 +1,36 @@
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+  external_labels:
+    monitor: 'ai-person-monitor'
+
+scrape_configs:
+  - job_name: 'api-gateway'
+    static_configs:
+      - targets: ['api-gateway:8000']
+        labels:
+          service: 'gateway'
+
+  - job_name: 'llm-service'
+    static_configs:
+      - targets: ['llm-service:8001']
+        labels:
+          service: 'llm'
+
+  - job_name: 'asr-service'
+    static_configs:
+      - targets: ['asr-service:8002']
+        labels:
+          service: 'asr'
+
+  - job_name: 'tts-service'
+    static_configs:
+      - targets: ['tts-service:8003']
+        labels:
+          service: 'tts'
+
+  - job_name: 'dialogue-service'
+    static_configs:
+      - targets: ['dialogue-service:8004']
+        labels:
+          service: 'dialogue'

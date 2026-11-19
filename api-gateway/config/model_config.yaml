@@ -1,0 +1,51 @@
+llm_engine:
+  backend: "vllm"
+  model_path: "./models/llm/qwen2-7b"
+  tokenizer_path: "./models/llm/qwen2-7b"
+  quantization: "fp16"
+  tensor_parallel: 1
+  max_model_len: 4096
+  gpu_memory_utilization: 0.9
+  dtype: "auto"
+  trust_remote_code: true
+  download_dir: "./models/llm"
+
+asr_engine:
+  backend: "funasr"
+  model_path: "./models/asr/speech_paraformer-large"
+  use_onnx: true
+  batch_size: 1
+  device: "cuda"
+  vad_model: "./models/asr/fsmn-vad"
+  punc_model: "./models/asr/punc_ct_transformer"
+
+tts_engine:
+  backend: "gpt_sovits"
+  model_path: "./models/tts/gpt_sovits_v2"
+  config_path: "./models/tts/gpt_sovits_v2/config.json"
+  use_trt: false
+  device: "cuda"
+  default_voice: "default"
+
+app:
+  host: "0.0.0.0"
+  port: 8000
+  debug: false
+  workers: 1
+
+cache:
+  enabled: true
+  type: "memory"
+  max_size_mb: 1024
+  ttl_seconds: 3600
+
+dialogue:
+  max_history_turns: 10
+  enable_emotion_detection: true
+  emotion_labels: ["happy", "sad", "angry", "surprised", "neutral"]
+
+performance:
+  enable_pipeline_parallel: true
+  enable_response_streaming: false
+  batch_size: 1
+  timeout_seconds: 120

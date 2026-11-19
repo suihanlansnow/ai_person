@@ -1,0 +1,305 @@
+version: '3.8'
+
+services:
+  ollama:
+    build:
+      context: ./ollama-service
+      dockerfile: Dockerfile
+    container_name: ai-person-ollama
+    ports:
+      - "11434:11434"
+    volumes:
+      - ./models/ollama:/root/.ollama/models
+    environment:
+      - OLLAMA_HOST=0.0.0.0:11434
+      - OLLAMA_MODELS=/root/.ollama/models
+      - CUDA_VISIBLE_DEVICES=0
+      - OLLAMA_FLASH_ATTENTION=1
+      - OLLAMA_NUM_PARALLEL=4
+      - OLLAMA_MAX_LOADED_MODELS=1
+      - OLLAMA_KEEP_ALIVE=1h
+      - LD_LIBRARY_PATH=/usr/local/cuda/lib64:/usr/local/cuda-11.8/lib64:/usr/lib/x86_64-linux-gnu:${LD_LIBRARY_PATH}
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
+    networks:
+      - ai-person-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:11434/api/tags"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+
+  api-gateway:
+    build:
+      context: ./api-gateway
+      dockerfile: Dockerfile
+    container_name: ai-person-gateway
+    ports:
+      - "8000:8000"
+    depends_on:
+      llm-service:
+        condition: service_healthy
+      asr-service:
+        condition: service_healthy
+      tts-service:
+        condition: service_healthy
+      dialogue-service:
+        condition: service_healthy
+      redis-cache:
+        condition: service_healthy
+    environment:
+      - LLM_SERVICE_URL=http://llm-service:8001
+      - ASR_SERVICE_URL=http://asr-service:8002
+      - TTS_SERVICE_URL=http://tts-service:8003
+      - DIALOGUE_SERVICE_URL=http://dialogue-service:8004
+      - REDIS_URL=redis://redis-cache:6379
+      - LOG_LEVEL=INFO
+    volumes:
+      - ./api-gateway/static:/app/static:ro
+    networks:
+      - ai-person-network
+    deploy:
+      resources:
+        limits:
+          memory: 1G
+        reservations:
+          memory: 512M
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/api/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+
+  llm-service:
+    build:
+      context: ./llm-service
+      dockerfile: Dockerfile
+    container_name: ai-person-llm
+    ports:
+      - "8001:8001"
+    depends_on:
+      redis-cache:
+        condition: service_healthy
+      ollama:
+        condition: service_healthy
+    environment:
+      - MODEL_PATH=/models/llm/qwen2-7b
+      - QUANTIZATION=fp16
+      - TENSOR_PARALLEL=1
+      - MAX_MODEL_LEN=4096
+      - REDIS_URL=redis://redis-cache:6379
+      - LOG_LEVEL=INFO
+      - LLM_BACKEND=ollama
+      - OPENAI_API_KEY=${OPENAI_API_KEY:-}
+      - LANG=C.UTF-8
+      - LC_ALL=C.UTF-8
+      - OLLAMA_BASE_URL=http://ollama:11434
+      - OLLAMA_MODEL=qwen2:1.5b
+    volumes:
+      - ./models/llm:/models/llm:ro
+      - ./data/cache/llm:/data/cache
+    networks:
+      - ai-person-network
+    deploy:
+      resources:
+        limits:
+          memory: 32G
+        reservations:
+          memory: 16G
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8001/health"]
+      interval: 30s
+      timeout: 30s
+      retries: 3
+      start_period: 180s
+
+  asr-service:
+    build:
+      context: ./asr-service
+      dockerfile: Dockerfile
+    container_name: ai-person-asr
+    ports:
+      - "8002:8002"
+    environment:
+      - MODEL_PATH=/models/asr/speech_paraformer-large
+      - USE_ONNX=true
+      - DEVICE=cuda
+      - LOG_LEVEL=INFO
+    volumes:
+      - ./models/asr:/models/asr:ro
+      - ./data/cache/asr:/data/cache
+      - ./data/cache/modelscope:/root/.cache/modelscope
+    networks:
+      - ai-person-network
+    deploy:
+      resources:
+        limits:
+          memory: 8G
+        reservations:
+          memory: 4G
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8002/health"]
+      interval: 60s
+      timeout: 30s
+      retries: 3
+      start_period: 360s
+
+  tts-service:
+    build:
+      context: ./tts-service
+      dockerfile: Dockerfile
+    container_name: ai-person-tts
+    ports:
+      - "8003:8003"
+    depends_on:
+      redis-cache:
+        condition: service_healthy
+    environment:
+      - MODEL_PATH=/models/tts/gpt_sovits_v2
+      - DEVICE=cuda
+      - REDIS_URL=redis://redis-cache:6379
+      - LOG_LEVEL=INFO
+    volumes:
+      - ./models/tts:/models/tts:ro
+      - ./data/voices:/data/voices
+      - ./data/cache/tts:/data/cache
+    networks:
+      - ai-person-network
+    deploy:
+      resources:
+        limits:
+          memory: 16G
+        reservations:
+          memory: 8G
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8003/health"]
+      interval: 30s
+      timeout: 30s
+      retries: 3
+      start_period: 120s
+
+  dialogue-service:
+    build:
+      context: ./dialogue-service
+      dockerfile: Dockerfile
+    container_name: ai-person-dialogue
+    ports:
+      - "8004:8004"
+    depends_on:
+      redis-cache:
+        condition: service_healthy
+    environment:
+      - REDIS_URL=redis://redis-cache:6379
+      - MEMORY_PATH=/data/memory
+      - LOG_LEVEL=INFO
+    volumes:
+      - ./data/memory:/data/memory
+    networks:
+      - ai-person-network
+    deploy:
+      resources:
+        limits:
+          memory: 2G
+        reservations:
+          memory: 1G
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8004/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+
+  redis-cache:
+    image: redis:7-alpine
+    container_name: ai-person-redis
+    ports:
+      - "6380:6379"
+    volumes:
+      - redis-data:/data
+      - ./config/redis.conf:/usr/local/etc/redis/redis.conf:ro
+    command: redis-server /usr/local/etc/redis/redis.conf
+    networks:
+      - ai-person-network
+    deploy:
+      resources:
+        limits:
+          memory: 4G
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: ai-person-prometheus
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./monitoring/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus-data:/prometheus
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--web.enable-lifecycle'
+    networks:
+      - ai-person-network
+    restart: unless-stopped
+
+  grafana:
+    image: grafana/grafana:latest
+    container_name: ai-person-grafana
+    ports:
+      - "3000:3000"
+    depends_on:
+      - prometheus
+    volumes:
+      - grafana-data:/var/lib/grafana
+      - ./monitoring/grafana.ini:/etc/grafana/grafana.ini:ro
+    environment:
+      - GF_SECURITY_ADMIN_PASSWORD=${GRAFANA_PASSWORD:-admin}
+      - GF_USERS_ALLOW_SIGN_UP=false
+    networks:
+      - ai-person-network
+    restart: unless-stopped
+
+networks:
+  ai-person-network:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.28.0.0/16
+
+volumes:
+  redis-data:
+    driver: local
+  prometheus-data:
+    driver: local
+  grafana-data:
+    driver: local

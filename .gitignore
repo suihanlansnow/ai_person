@@ -1,0 +1,63 @@
+# ---------- Python ----------
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+dist/
+*.egg-info/
+.eggs/
+sdist/
+wheels/
+
+# ---------- 虚拟环境 ----------
+.venv/
+venv/
+env/
+ENV/
+
+# ---------- 环境变量与密钥 ----------
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+
+# ---------- IDE / 操作系统 ----------
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+.DS_Store
+Thumbs.db
+
+# ---------- 测试与工具缓存 ----------
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.tox/
+.coverage
+htmlcov/
+
+# ---------- 日志 ----------
+logs/
+*.log
+
+# ---------- 运行时数据（Docker 绑定挂载） ----------
+data/
+
+# ---------- 模型权重（体积大，需单独下载） ----------
+/models/*
+!/models/__init__.py
+!/models/registry.py
+
+# ---------- 第三方安装包（1.6GB） ----------
+download/
+/ollama-service/*.tgz
+
+# ---------- 音频产物 ----------
+*.wav
+*.mp3
+*.flac
